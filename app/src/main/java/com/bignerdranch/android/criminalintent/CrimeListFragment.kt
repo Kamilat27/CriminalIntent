@@ -1,5 +1,6 @@
 package com.bignerdranch.android.criminalintent
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -7,18 +8,42 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import java.util.*
 
 private const val TAG = "CrimeListFragment"
 
 class CrimeListFragment : Fragment() {
 
+    /**
+     * Required interface for hosting activities
+     */
+    interface Callbacks {
+        fun onCrimeSelected(crimeId: UUID)
+    }
+
+    private var callbacks: Callbacks? = null
+
     private lateinit var crimeRecyclerView : RecyclerView
+    private var adapter: CrimeAdapter? = null
+
     private val crimeListViewModel : CrimeListViewModel by lazy {
         ViewModelProviders.of(this).get(CrimeListViewModel::class.java)
+    }
+
+
+    /* Activity is a subclass of Context, so onAttach() passes a Context as a parameter,
+    which is more flexible. Ensure that you use the onAttach(Context) signature for onAttach(...)
+    and not the deprecated onAttach(Activity) function, which may be removed in future versions
+    of the API.
+     */
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        callbacks = context as Callbacks?
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,15 +64,51 @@ class CrimeListFragment : Fragment() {
         // When you create a RecyclerView, you give it another object called LayoutManager.
         // RecyclerView requires a LayoutManager to work.
         // If you forget to give it one, it will crash.
+
+        updateUI()
+
         return view
+    }
+
+
+
+    override fun onDetach() {
+        super.onDetach()
+        callbacks = null
+    }
+
+    private fun updateUI() {
+        val crimes = crimeListViewModel.crimes
+        adapter = CrimeAdapter(crimes)
+        crimeRecyclerView.adapter = adapter
     }
 
     /* The RecyclerView expects an item view to be wrapped in an instance of ViewHolder.
     A ViewHolder stores a reference to an item's view (and sometimes reference to a
     specific widgets within that view)*/
-    private inner class CrimeHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val titleTextView: TextView = itemView.findViewById(R.id.crime_title)
-        val dateTextView: TextView = itemView.findViewById(R.id.crime_date)
+
+
+    private inner class CrimeHolder(view: View) : RecyclerView.ViewHolder(view), View.OnClickListener {
+
+        private lateinit var crime: Crime
+
+        private val titleTextView: TextView = itemView.findViewById(R.id.crime_title)
+        private val dateTextView: TextView = itemView.findViewById(R.id.crime_date)
+
+        init {
+            itemView.setOnClickListener(this)
+        }
+
+        fun bind(crime: Crime) {
+            this.crime = crime
+            titleTextView.text = this.crime.title
+            dateTextView.text = this.crime.date.toString()
+        }
+
+        override fun onClick(v: View?) {
+           callbacks?.onCrimeSelected(crime.id)
+
+        }
     }
 
     private inner class CrimeAdapter(var crimes: List<Crime>) : RecyclerView.Adapter<CrimeHolder>() {
@@ -61,10 +122,9 @@ class CrimeListFragment : Fragment() {
 
         override fun onBindViewHolder(holder: CrimeHolder, position: Int) {
             val crime = crimes[position]
-            holder.apply {
-                titleTextView.text = crime.title
-                dateTextView.text = crime.date.toString()
-            }
+            holder.bind(crime)
+
+
         }
 
     }
@@ -74,4 +134,5 @@ class CrimeListFragment : Fragment() {
             return CrimeListFragment()
         }
     }
+    
 }
